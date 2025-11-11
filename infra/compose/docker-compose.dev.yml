@@ -5,12 +5,16 @@ services:
       context: ../..
       dockerfile: infra/docker/backend/Dockerfile
     environment:
-      - UVICORN_WORKERS=1
-      - UVICORN_RELOAD=true
+      PLANNER_JWT_SECRET: dev-secret
+      PLANNER_ACCESS_TOKEN_MINUTES: 15
+      PLANNER_REFRESH_TOKEN_MINUTES: 1440
     volumes:
       - ../..:/workspace
+      - ../../secrets/.env.dev:/workspace/backend/.env:ro
     ports:
       - "8000:8000"
+    depends_on:
+      - postgres
   frontend:
     build:
       context: ../..
@@ -23,6 +27,16 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker/Dockerfile
+    command: python -m planner.worker --once
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      - backend
+      - redis
   redis:
     image: redis:7-alpine
     ports:

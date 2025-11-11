@@ -3,13 +3,15 @@ services:
   backend:
     image: ghcr.io/org/planner-backend:latest
     environment:
-      - UVICORN_WORKERS=4
+      UVICORN_WORKERS: 4
+      FEATURE_FLAG_DASHBOARD: "true"
     ports:
       - "8000:8000"
   frontend:
     image: ghcr.io/org/planner-frontend:latest
     environment:
-      - NODE_ENV=production
+      NODE_ENV: production
+      FEATURE_FLAG_DASHBOARD: "true"
     ports:
       - "80:80"
   worker:
