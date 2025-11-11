@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "backend": {
+    "lang": "Python 3.12",
+    "framework": "FastAPI"
+  },
+  "frontend": {
+    "lang": "TypeScript",
+    "framework": "React+Vite"
+  },
+  "infra": {
+    "compose": "3.9",
+    "db": "PostgreSQL 16",
+    "cache": "Redis 7"
+  },
+  "ci": [
+    "GitHub Actions"
+  ],
+  "scripts": [
+    "PowerShell",
+    "Bash"
+  ]
+}
