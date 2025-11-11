@@ -1,23 +1,34 @@
 {
-  "version": "0.2.0",
-  "backend": {
-    "lang": "Python 3.12",
-    "framework": "FastAPI"
+  "version": "0.3.0",
+  "phase": "Phase 1 Codex Init",
+  "services": {
+    "backend": {
+      "language": "Python 3.12",
+      "framework": "FastAPI",
+      "package": "planner-backend",
+      "entrypoint": "backend/app/main.py"
+    },
+    "frontend": {
+      "language": "TypeScript",
+      "framework": "React + Vite",
+      "package": "planner-frontend",
+      "entrypoint": "frontend/src/main.tsx"
+    }
   },
-  "frontend": {
-    "lang": "TypeScript",
-    "framework": "React+Vite"
+  "infrastructure": {
+    "compose_version": "3.9",
+    "dockerfiles": [
+      "infra/docker/backend/Dockerfile",
+      "infra/docker/frontend/Dockerfile",
+      "infra/docker/worker/Dockerfile",
+      "infra/docker/prometheus/Dockerfile"
+    ],
+    "helm_chart": "infra/helm/planner",
+    "terraform": "infra/terraform"
   },
-  "infra": {
-    "compose": "3.9",
-    "db": "PostgreSQL 16",
-    "cache": "Redis 7"
-  },
-  "ci": [
-    "GitHub Actions"
-  ],
-  "scripts": [
-    "PowerShell",
-    "Bash"
-  ]
+  "tooling": {
+    "ci": ["GitHub Actions"],
+    "testing": ["Pytest", "Vitest"],
+    "observability": ["Prometheus", "Grafana", "Loki"]
+  }
 }

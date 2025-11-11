@@ -1,0 +1,6 @@
+backend:
+  image: ghcr.io/org/planner-backend:latest
+frontend:
+  image: ghcr.io/org/planner-frontend:latest
+worker:
+  image: ghcr.io/org/planner-worker:latest

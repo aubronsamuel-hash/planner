@@ -1,0 +1,5 @@
+apiVersion: v2
+name: planner
+version: 0.1.0
+description: Planner monorepo umbrella chart placeholder.
+type: application
