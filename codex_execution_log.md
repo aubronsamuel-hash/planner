@@ -72,3 +72,10 @@ errors.
 - Rédaction de `codex_deploy_plan.md` détaillant la stratégie Compose prod, Helm chart, pipeline GitHub Actions `deploy.yml`, gestion des secrets `.env.prod` et observabilité Prometheus/Grafana.
 - Inventaire des dépendances externes (PostgreSQL managé, Redis, cluster Kubernetes, registry GHCR) et points de contrôle (tests Pytest, lint Helm, scans Trivy) à intégrer avant exécution.
 - Aucune action de déploiement exécutée : phase limitée à la planification et à la documentation en vue de l'industrialisation.
+
+## Phase 4 – Deploy (Exécution)
+- **Préparation** : relecture de `codex_deploy_plan.md` pour confirmer la feuille de route avant exécution.
+- **Vérification des prérequis Docker** : tentative d'exécution de `docker --version` pour initialiser le build des images backend/frontend/worker.
+- **Résultat** : l'environnement d'exécution ne dispose pas de l'outil Docker (`bash: command not found: docker`), empêchant la construction des images et toutes les étapes ultérieures (stack Compose, sondes `/health`/`/metrics`, workflow GitHub Actions, monitoring).
+- **Décision** : arrêt immédiat de la phase de déploiement conformément aux instructions (stop sur erreur) et consignation de l'incident.
+- **Plan de rollback** : aucun changement n'ayant été appliqué sur des environnements distants, conserver l'état actuel du dépôt, provisionner un hôte/runner avec Docker Engine et Docker Compose installés, rejouer la phase en reprenant par la construction des images, puis relancer la CI/CD une fois l'infrastructure disponible.
