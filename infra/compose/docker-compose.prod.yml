@@ -19,8 +19,11 @@ services:
     depends_on:
       - backend
   prometheus:
-    image: prom/prometheus:v2.52.0
-    volumes:
-      - ../docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    build:
+      context: ../docker/prometheus
+      dockerfile: Dockerfile
     ports:
       - "9090:9090"
+    depends_on:
+      - backend
+      - worker
