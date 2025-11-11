@@ -66,3 +66,9 @@ errors.
 - Introduire des mutations côté client pour la création de missions et l'approbation des timesheets, et couvrir ces flux dans `tests/e2e` pour sécuriser le déploiement continu.【F:frontend/src/routes/Missions.tsx†L15-L24】【F:frontend/src/routes/Timesheets.tsx†L16-L23】
 - Étendre les pipelines CI/CD (Makefile `test`, scripts `run_tests.sh`, `smoke.sh`) afin d'inclure les tests frontend une fois les dépendances disponibles et d'orchestrer le lancement du backend avant les smoke tests.【F:Makefile†L1-L13】【F:scripts/sh/run_tests.sh†L1-L33】【F:scripts/sh/smoke.sh†L1-L16】
 - Préparer les manifestes infra (`infra/compose`, `infra/docker`, `infra/helm`, `infra/terraform`) pour intégrer la configuration d'URL corrigée et les secrets d'authentification avant promotion en environnement de déploiement.【F:infra/compose/docker-compose.dev.yml†L1-L60】【F:infra/docker/backend/Dockerfile†L1-L24】
+
+## Phase 4 – Deploy (Planification)
+- Lecture des rapports `codex_validation_report.md` et `codex_execution_log.md` pour consolider les écarts frontend/API et la couverture de tests existante.
+- Rédaction de `codex_deploy_plan.md` détaillant la stratégie Compose prod, Helm chart, pipeline GitHub Actions `deploy.yml`, gestion des secrets `.env.prod` et observabilité Prometheus/Grafana.
+- Inventaire des dépendances externes (PostgreSQL managé, Redis, cluster Kubernetes, registry GHCR) et points de contrôle (tests Pytest, lint Helm, scans Trivy) à intégrer avant exécution.
+- Aucune action de déploiement exécutée : phase limitée à la planification et à la documentation en vue de l'industrialisation.
