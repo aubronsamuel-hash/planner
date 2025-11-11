@@ -73,9 +73,17 @@ errors.
 - Inventaire des dépendances externes (PostgreSQL managé, Redis, cluster Kubernetes, registry GHCR) et points de contrôle (tests Pytest, lint Helm, scans Trivy) à intégrer avant exécution.
 - Aucune action de déploiement exécutée : phase limitée à la planification et à la documentation en vue de l'industrialisation.
 
-## Phase 4 – Deploy (Exécution)
+## Phase 4 – Deploy (Exécution – tentative précédente)
 - **Préparation** : relecture de `codex_deploy_plan.md` pour confirmer la feuille de route avant exécution.
 - **Vérification des prérequis Docker** : tentative d'exécution de `docker --version` pour initialiser le build des images backend/frontend/worker.
 - **Résultat** : l'environnement d'exécution ne dispose pas de l'outil Docker (`bash: command not found: docker`), empêchant la construction des images et toutes les étapes ultérieures (stack Compose, sondes `/health`/`/metrics`, workflow GitHub Actions, monitoring).
 - **Décision** : arrêt immédiat de la phase de déploiement conformément aux instructions (stop sur erreur) et consignation de l'incident.
 - **Plan de rollback** : aucun changement n'ayant été appliqué sur des environnements distants, conserver l'état actuel du dépôt, provisionner un hôte/runner avec Docker Engine et Docker Compose installés, rejouer la phase en reprenant par la construction des images, puis relancer la CI/CD une fois l'infrastructure disponible.
+
+## Phase 4 – Deploy (Exécution – relance)
+- **Étape 1 – Build des images** : tentatives `docker build` pour les Dockerfiles backend, frontend et worker (`infra/docker/backend/Dockerfile`, `infra/docker/frontend/Dockerfile`, `infra/docker/worker/Dockerfile`). Chaque commande échoue immédiatement car Docker n'est pas installé sur l'hôte (`bash: command not found: docker`).【c88b39†L1-L3】【8c9436†L1-L3】【51f3ca†L1-L3】
+- **Étape 2 – Stack Compose prod** : lancement `docker compose -f infra/compose/docker-compose.prod.yml up -d` impossible pour la même raison (binaire Docker absent).【f527ac†L1-L3】
+- **Étape 3 – Vérifications `/health` et `/metrics`** : non exécutées, l'application n'étant pas démarrée faute de conteneurs.
+- **Étape 4 – Workflow GitHub Actions `deploy.yml`** : non déclenché afin d'éviter un échec automatique en l'absence d'images et de stack déployée.
+- **Étape 5 – Configuration Prometheus & Grafana** : non réalisée car la stack d'observabilité dépend de l'orchestration Docker.
+- **Décision** : documenter l'impossibilité d'avancer sur cette relance et recommander de provisionner un environnement avec Docker/Compose avant de retenter la phase.
