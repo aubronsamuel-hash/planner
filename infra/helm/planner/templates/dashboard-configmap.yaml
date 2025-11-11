@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: planner-dashboard-config
+  labels:
+    app.kubernetes.io/name: planner
+    app.kubernetes.io/component: dashboard
+data:
+  FEATURE_FLAG_DASHBOARD: "true"
+  DASHBOARD_POLLING_INTERVAL: "30000"
