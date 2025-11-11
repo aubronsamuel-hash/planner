@@ -1,0 +1,45 @@
+version: "3.9"
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend/Dockerfile
+    environment:
+      - UVICORN_WORKERS=1
+      - UVICORN_RELOAD=true
+    volumes:
+      - ../..:/workspace
+    ports:
+      - "8000:8000"
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/frontend/Dockerfile
+    working_dir: /workspace/frontend
+    command: pnpm run dev -- --host 0.0.0.0 --port 5173
+    volumes:
+      - ../..:/workspace
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: planner
+      POSTGRES_USER: planner
+      POSTGRES_PASSWORD: planner
+    ports:
+      - "5432:5432"
+  prometheus:
+    build:
+      context: ../..
+      dockerfile: infra/docker/prometheus/Dockerfile
+    volumes:
+      - ../docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
