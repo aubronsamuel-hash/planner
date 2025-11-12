@@ -1,71 +1,96 @@
-"""Security helpers used by the generated FastAPI routes."""
+"""Security helpers used by the Planner services."""
 from __future__ import annotations
 
+import base64
 import hashlib
-import hmac
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Tuple
+from typing import Any
+
+import bcrypt
+import jwt
 
 from .config import get_settings
 
-_PASSWORD_SALT = "planner-demo-salt"
-_TOKEN_STORE: Dict[str, Tuple[str, datetime]] = {}
 
+def _normalize_password(password: str) -> bytes:
+    """Return a bcrypt-safe byte string for ``password``.
 
-def _hash(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+    Native ``bcrypt`` hashes silently truncate passwords longer than 72 bytes.
+    The Planner specs require resistance against that limitation, so passwords
+    are first hashed with SHA-256 and the digest is base64-encoded to keep a
+    consistent and short length before being passed to ``bcrypt``. The
+    base64-encoding ensures we only feed ASCII bytes to the bcrypt library while
+    still covering arbitrary-length user passwords.
+    """
+
+    digest = hashlib.sha256(password.encode("utf-8")).digest()
+    return base64.b64encode(digest)
 
 
 def hash_password(password: str) -> str:
-    """Return a deterministic hash for the provided password."""
+    """Hash a password using bcrypt with SHA-256 preprocessing."""
 
-    return _hash(f"{_PASSWORD_SALT}:{password}")
+    normalized = _normalize_password(password)
+    hashed = bcrypt.hashpw(normalized, bcrypt.gensalt())
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Constant-time verification used during login."""
+    """Verify that ``plain_password`` matches ``hashed_password``."""
 
-    candidate = hash_password(plain_password)
-    return hmac.compare_digest(candidate, hashed_password)
-
-
-def create_token(subject: str, *, expiry_minutes: int) -> Tuple[str, datetime]:
-    """Generate a pseudo JWT token and its expiration date."""
-
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=expiry_minutes)
-    _TOKEN_STORE[token] = (subject, expires_at)
-    return token, expires_at
+    normalized = _normalize_password(plain_password)
+    return bcrypt.checkpw(normalized, hashed_password.encode("utf-8"))
 
 
-def revoke_token(token: str) -> None:
-    _TOKEN_STORE.pop(token, None)
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-def resolve_token(token: str) -> str | None:
-    """Return the subject associated with a token if it is still valid."""
+def create_access_token(subject: str, role: str, *, expires_minutes: int) -> str:
+    """Create a signed JWT access token."""
 
-    if token not in _TOKEN_STORE:
-        return None
-    subject, expires_at = _TOKEN_STORE[token]
-    if datetime.now(timezone.utc) >= expires_at:
-        _TOKEN_STORE.pop(token, None)
-        return None
-    return subject
-
-
-def issue_access_refresh_pair(subject: str) -> tuple[str, str]:
     settings = get_settings()
-    access_token, _ = create_token(subject, expiry_minutes=settings.access_token_expiry_minutes)
-    refresh_token, _ = create_token(subject, expiry_minutes=settings.refresh_token_expiry_minutes)
-    return access_token, refresh_token
+    expire = _now() + timedelta(minutes=expires_minutes)
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "role": role,
+        "iat": int(_now().timestamp()),
+        "exp": int(expire.timestamp()),
+        "jti": secrets.token_hex(8),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_access_token(token: str) -> dict[str, Any]:
+    """Decode and validate an access token."""
+
+    settings = get_settings()
+    return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+
+
+def generate_refresh_token(*, expires_minutes: int) -> tuple[str, str, datetime]:
+    """Return the refresh token, its SHA256 hash and expiry timestamp."""
+
+    token = secrets.token_urlsafe(48)
+    expires_at = _now() + timedelta(minutes=expires_minutes)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return token, token_hash, expires_at
+
+
+@dataclass(frozen=True)
+class TokenPair:
+    access_token: str
+    refresh_token: str
+    expires_at: datetime
 
 
 __all__ = [
+    "TokenPair",
+    "create_access_token",
+    "decode_access_token",
+    "generate_refresh_token",
     "hash_password",
     "verify_password",
-    "issue_access_refresh_pair",
-    "resolve_token",
-    "revoke_token",
 ]
