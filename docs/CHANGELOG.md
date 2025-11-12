@@ -36,6 +36,9 @@
 - Résolution du problème de compatibilité `asyncpg`.
 - Amélioration du cache GitHub Actions pour pip et npm.
 - Correction des tests asynchrones avec `pytest-asyncio`.
+- **bcrypt+SQLAlchemy fix** : implémentation complète de l’authentification
+  asynchrone (JWT HS256, JTI Redis, migrations Alembic) pour la phase
+  Blueprint v3.1-Recovery.
 
 ---
 
