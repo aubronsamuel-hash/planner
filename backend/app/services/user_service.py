@@ -1,31 +1,30 @@
 """User service backed by SQLAlchemy and Redis."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
-from ..core.redis import get_redis
+from ..core.redis import delete_key, ensure_redis, set_with_ttl
 from ..core.security import (
     create_access_token,
     decode_access_token,
     generate_refresh_token,
     hash_password,
+    revoke_jti,
     verify_password,
 )
 from ..db.models import RefreshToken, Role, User
+from ..db.session import get_session_maker
 from ..models.user import RefreshRequest, TokenPair, UserCreate, UserLogin, UserRead
-
-_SETTINGS = get_settings()
-_REDIS: Redis = get_redis()
 
 _REQUIRED_ROLES = ("admin", "manager", "collaborator", "observer")
 
@@ -84,16 +83,25 @@ async def create_user(session: AsyncSession, payload: UserCreate) -> UserRead:
 
 
 async def _persist_refresh_token(
-    session: AsyncSession, user: User, token_hash: str, expires_at: datetime
+    session: AsyncSession,
+    user: User,
+    token_hash: str,
+    expires_at: datetime,
+    access_jti: str,
 ) -> None:
-    record = RefreshToken(user=user, token_hash=token_hash, expires_at=expires_at)
+    record = RefreshToken(
+        user=user, token_hash=token_hash, expires_at=expires_at, access_jti=access_jti
+    )
     session.add(record)
     await session.flush()
-    ttl = int((expires_at - datetime.now(timezone.utc)).total_seconds())
-    await _REDIS.set(f"refresh:{token_hash}", str(user.id), ex=max(ttl, 1))
+    ttl = max(int((expires_at - datetime.now(timezone.utc)).total_seconds()), 1)
+    await set_with_ttl(
+        f"refresh:{token_hash}", f"{user.id}:{access_jti}".encode("utf-8"), ttl
+    )
 
 
 async def authenticate_user(session: AsyncSession, payload: UserLogin) -> TokenPair:
+    settings = get_settings()
     result = await session.execute(
         select(User).options(selectinload(User.role)).where(User.email == payload.email)
     )
@@ -103,13 +111,13 @@ async def authenticate_user(session: AsyncSession, payload: UserLogin) -> TokenP
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User disabled")
 
-    access_token = create_access_token(
-        str(user.id), user.role.name, expires_minutes=_SETTINGS.access_token_expiry_minutes
+    access_token, access_jti = await create_access_token(
+        str(user.id), user.role.name, expires_minutes=settings.access_token_expiry_minutes
     )
     refresh_token, refresh_hash, expires_at = generate_refresh_token(
-        expires_minutes=_SETTINGS.refresh_token_expiry_minutes
+        expires_minutes=settings.refresh_token_expiry_minutes
     )
-    await _persist_refresh_token(session, user, refresh_hash, expires_at)
+    await _persist_refresh_token(session, user, refresh_hash, expires_at, access_jti)
     await session.commit()
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
@@ -130,8 +138,15 @@ async def refresh_tokens(session: AsyncSession, payload: RefreshRequest) -> Toke
     if expires_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    redis_owner = await _REDIS.get(f"refresh:{refresh_hash}")
-    if redis_owner is None or int(redis_owner) != record.user_id:
+    redis_client = await ensure_redis()
+    redis_owner = await redis_client.get(f"refresh:{refresh_hash}")
+    if redis_owner is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+    owner_str = redis_owner.decode("utf-8") if isinstance(redis_owner, bytes) else str(redis_owner)
+    owner_id_str, _, owner_jti = owner_str.partition(":")
+    if not owner_id_str or int(owner_id_str) != record.user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+    if record.access_jti and owner_jti and owner_jti != record.access_jti:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
 
     user = await session.get(User, record.user_id, options=(selectinload(User.role),))
@@ -139,33 +154,46 @@ async def refresh_tokens(session: AsyncSession, payload: RefreshRequest) -> Toke
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown token owner")
 
     record.revoked = True
-    await _REDIS.delete(f"refresh:{refresh_hash}")
+    if record.access_jti:
+        await revoke_jti(record.access_jti)
+    await delete_key(f"refresh:{refresh_hash}")
 
-    access_token = create_access_token(
-        str(user.id), user.role.name, expires_minutes=_SETTINGS.access_token_expiry_minutes
+    settings = get_settings()
+    access_token, access_jti = await create_access_token(
+        str(user.id), user.role.name, expires_minutes=settings.access_token_expiry_minutes
     )
     new_refresh, new_hash, expires_at = generate_refresh_token(
-        expires_minutes=_SETTINGS.refresh_token_expiry_minutes
+        expires_minutes=settings.refresh_token_expiry_minutes
     )
-    await _persist_refresh_token(session, user, new_hash, expires_at)
+    await _persist_refresh_token(session, user, new_hash, expires_at, access_jti)
     await session.commit()
     return TokenPair(access_token=access_token, refresh_token=new_refresh)
 
 
-async def logout(session: AsyncSession, refresh_token: str) -> None:
+async def logout(session: AsyncSession, refresh_token: str, access_token: str | None = None) -> None:
     refresh_hash = _hash_refresh_token(refresh_token)
     result = await session.execute(select(RefreshToken).where(RefreshToken.token_hash == refresh_hash))
     record = result.scalar_one_or_none()
     if not record:
         return
     record.revoked = True
+    if record.access_jti:
+        await revoke_jti(record.access_jti)
+    if access_token:
+        try:
+            payload = await decode_access_token(access_token)
+            jti = payload.get("jti")
+            if jti:
+                await revoke_jti(jti)
+        except Exception:  # pragma: no cover - invalid token during logout
+            pass
     await session.commit()
-    await _REDIS.delete(f"refresh:{refresh_hash}")
+    await delete_key(f"refresh:{refresh_hash}")
 
 
 async def get_user_from_token(session: AsyncSession, token: str) -> Optional[UserRead]:
     try:
-        payload = decode_access_token(token)
+        payload = await decode_access_token(token)
     except Exception as exc:  # pragma: no cover - jwt raises multiple error types
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
 
@@ -186,6 +214,31 @@ async def get_user_by_email(session: AsyncSession, email: str) -> Optional[UserR
     return _to_user_read(user)
 
 
+async def _reset_state_async() -> None:
+    session_maker = get_session_maker()
+    async with session_maker() as session:
+        await session.execute(delete(RefreshToken))
+        await session.execute(delete(User))
+        await session.commit()
+    redis_client = await ensure_redis()
+    await redis_client.flushdb()
+
+
+async def reset_state_async() -> None:
+    await _reset_state_async()
+
+
+def reset_state() -> None:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(_reset_state_async())
+        return
+    raise RuntimeError(
+        "reset_state cannot run inside an active event loop; use reset_state_async instead"
+    )
+
+
 __all__ = [
     "authenticate_user",
     "create_user",
@@ -193,4 +246,6 @@ __all__ = [
     "get_user_from_token",
     "logout",
     "refresh_tokens",
+    "reset_state",
+    "reset_state_async",
 ]

@@ -12,3 +12,10 @@ infrastructure, tests, and CI placeholders.
 
 Refer to `docs/INDEX_v3.md` and `codex_roadmap_v4.md` for the full delivery
 context.
+
+## Authentication Highlights
+- Passwords are normalized with SHA-256 before bcrypt hashing, satisfying the
+  security constraints from the SRS and preventing bcrypt truncation issues.
+- Access tokens include a unique JTI stored in Redis with a TTL that matches
+  the token lifetime, ensuring automatic cleanup of revoked tokens and
+  alignment with the Redis cache requirements.

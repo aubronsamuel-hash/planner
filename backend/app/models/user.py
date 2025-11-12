@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 class UserBase(BaseModel):
     email: str = Field(..., min_length=3)
     full_name: str = Field(..., min_length=1)
+    role: str = Field(..., min_length=1)
 
     @field_validator("email")
     @classmethod
