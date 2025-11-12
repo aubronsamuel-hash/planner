@@ -1,0 +1,23 @@
+name: Worker Tests
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: pip install ./backend[dev]
+      - name: Run worker queue test
+        env:
+          PLANNER_REDIS_URL: fakeredis://
+        run: pytest backend/tests/test_worker_queue.py

@@ -1,5 +1,13 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /workspace
 COPY ../../.. /workspace
-CMD ["python", "-c", "print('Planner worker placeholder');import time;time.sleep(3600)"]
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir ./backend
+
+WORKDIR /workspace/backend
+
+ENV PLANNER_REDIS_URL="redis://redis:6379/0" \
+    PLANNER_WORKER_METRICS_PORT="9000"
+
+CMD ["python", "-m", "backend.app.worker.main"]
