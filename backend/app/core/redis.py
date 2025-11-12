@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from typing import Optional
+
 from redis.asyncio import Redis
 
 from .config import get_settings

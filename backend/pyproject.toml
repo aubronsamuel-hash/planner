@@ -18,6 +18,9 @@ dependencies = [
     "passlib>=1.7",
     "asyncpg>=0.29",
     "aiosqlite>=0.19",
+    "prometheus-client>=0.20",
+    "python-logging-loki>=0.3",
+    "rq==1.15",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,88 @@
+{
+  "id": null,
+  "uid": "planner-worker-overview",
+  "title": "Planner Worker & Backend Overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "HTTP Requests",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by(method) (increase(planner_http_requests_total[5m]))",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker Jobs",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by(task) (increase(rq_jobs_total[5m]))",
+          "legendFormat": "{{task}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by(task) (increase(rq_failures_total[5m]))",
+          "legendFormat": "{{task}} failures",
+          "refId": "B"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Loki Logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "expr": "{service=\"planner-backend\"} | logfmt",
+          "refId": "A"
+        },
+        {
+          "expr": "{service=\"planner-worker\"} | logfmt",
+          "refId": "B"
+        }
+      ],
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      }
+    }
+  ]
+}

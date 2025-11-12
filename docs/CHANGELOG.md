@@ -1,8 +1,30 @@
 # 🧾 CHANGELOG – Planner Blueprint
 
 > **Convention :** basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/)
-> **Version actuelle : 0.3.0 (Blueprint v3)**
+> **Version actuelle : 0.3.2 (Blueprint v3)**
 > **Format :** SemVer (Semantic Versioning)
+
+---
+
+## [0.3.2] – 2025-11-15
+### 🚀 Added
+- Worker Redis RQ (`backend/app/worker/`) avec métriques Prometheus (`rq_jobs_total`,
+  `rq_failures_total`, `rq_job_duration_seconds`).
+- Endpoint `/metrics` FastAPI (compteurs, histogrammes et jauges HTTP).
+- Stack monitoring Docker Compose : Prometheus, Grafana (datasources provisionnées),
+  Loki + dashboard `planner-overview`.
+- Workflows GitHub Actions `test_worker.yml` et `deploy.yml` (push image GHCR,
+  vérification `curl /metrics`).
+- Documentation `docs/monitoring.md` et `docs/worker_reference.md`.
+
+### 🧰 Changed
+- Dockerfiles backend/worker installent le package Python pour exposer les
+  métriques et la configuration Loki.
+- `Makefile` expose `make monitoring` pour démarrer l’observabilité locale.
+
+### 🧪 Tests
+- Nouveaux tests Pytest sur l’instrumentation (`test_metrics.py`,
+  `test_worker_tasks.py`, `test_worker_queue.py`).
 
 ---
 

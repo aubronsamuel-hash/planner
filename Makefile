@@ -1,19 +1,22 @@
-.PHONY: bootstrap up down test fmt lint
+.PHONY: bootstrap up down test fmt lint monitoring
 
 bootstrap:
-./scripts/sh/init_repo.sh
+	./scripts/sh/init_repo.sh
 
 up:
-./scripts/sh/dev_up.sh
+	./scripts/sh/dev_up.sh
 
 down:
-./scripts/sh/dev_down.sh
+	./scripts/sh/dev_down.sh
 
 test:
-./scripts/sh/run_tests.sh
+	./scripts/sh/run_tests.sh
 
 fmt:
-./scripts/sh/fmt.sh
+	./scripts/sh/fmt.sh
 
 lint:
-./scripts/sh/lint.sh
+	./scripts/sh/lint.sh
+
+monitoring:
+	./scripts/sh/dev_monitoring.sh
